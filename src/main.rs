@@ -8,8 +8,9 @@ mod string_utils;
 use chrono::prelude::{DateTime, Utc};
 use clap::{App, Arg};
 use regex::Regex;
+use std::fs;
 
-fn main() {
+fn main() -> std::io::Result<()> {
     let matches = App::new("Re-timestamp")
                     .version("1.0")
                     .author("sparkymat")
@@ -99,11 +100,12 @@ fn main() {
                         matches.start()..matches.end(),
                         now.format(replacement_pattern).to_string().as_str(),
                     );
-                    println!("{}", after);
+                    fs::rename(path_string, after)?;
                     break;
                 }
             }
         }
+        Ok(())
     } else {
         panic!("pending");
     }
