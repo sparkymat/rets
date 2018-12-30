@@ -5,7 +5,7 @@ extern crate git2;
 mod git_utils;
 mod string_utils;
 
-use chrono::prelude::{DateTime, Utc};
+use chrono::prelude::{FixedOffset, Utc};
 use clap::{App, Arg};
 use regex::Regex;
 use std::fs;
@@ -77,7 +77,7 @@ fn main() -> std::io::Result<()> {
         .unwrap();
         regexes.push((String::from("yyyymmdd"), &yyyymmdd, String::from("%Y%m%d")));
 
-        for path_string in new_migration_files.iter() {
+        for (index, path_string) in new_migration_files.iter().enumerate() {
             for (re_name, re, replacement_pattern) in regexes.iter() {
                 if re.is_match(path_string) {
                     let matches = re.find(path_string).unwrap();
@@ -94,7 +94,8 @@ fn main() -> std::io::Result<()> {
                     )
                     .unwrap();
                     println!("{}{}", blank_prefix, position_string);
-                    let now: DateTime<Utc> = Utc::now();
+                    let offset = FixedOffset::east(index as i32);
+                    let now = Utc::now() + offset;
                     let mut after = String::from(path_string.as_str());
                     after.replace_range(
                         matches.start()..matches.end(),

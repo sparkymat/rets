@@ -20,15 +20,15 @@ pub fn find_new_files_at_path(file_path: &str) -> Result<Vec<String>, Error> {
 
     let diff = repo.diff_tree_to_tree(Some(&master_branch_tree), Some(&head_commit_tree), None)?;
 
-    let mut new_migration_files: Vec<String> = Vec::new();
+    let mut newly_added_files: Vec<String> = Vec::new();
     for delta in diff.deltas() {
         let path = delta.new_file().path().unwrap();
         if delta.old_file().id().is_zero()
             && !delta.new_file().id().is_zero()
             && path.starts_with(file_path)
         {
-            new_migration_files.push(String::from(path.to_str().unwrap()));
+            newly_added_files.push(String::from(path.to_str().unwrap()));
         }
     }
-    return Ok(new_migration_files);
+    return Ok(newly_added_files);
 }
