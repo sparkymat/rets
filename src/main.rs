@@ -2,30 +2,12 @@ extern crate chrono;
 extern crate clap;
 extern crate git2;
 
+mod git_utils;
+mod string_utils;
+
 use chrono::prelude::{DateTime, Utc};
 use clap::{App, Arg};
-use git2::{BranchType, Repository};
 use regex::Regex;
-
-fn range_position_string(value: &String, start_pos: usize, end_pos: usize) -> Option<String> {
-    if start_pos > value.len() || end_pos > value.len() || start_pos >= end_pos {
-        return None;
-    }
-    let mut position_string = String::with_capacity(value.len());
-    for (i, _ch) in value.chars().enumerate() {
-        if i == start_pos {
-            position_string.push('└');
-        } else if i == end_pos - 1 {
-            position_string.push('┘');
-        } else if (i > start_pos) && (i < end_pos - 1) {
-            position_string.push('─');
-        } else {
-            position_string.push(' ');
-        }
-    }
-
-    return Some(position_string);
-}
 
 fn main() {
     let matches = App::new("Re-timestamp")
@@ -39,60 +21,11 @@ fn main() {
                     .get_matches();
     if matches.is_present("rails-migration") {
         println!("**Rails mode**");
-        let repo = match Repository::discover(".") {
-            Ok(repo) => repo,
-            Err(_e) => panic!("Not a git repo"),
-        };
-        let head = match repo.head() {
-            Ok(reference) => reference,
-            Err(_e) => panic!("Unable to get ref to HEAD"),
-        };
-        if !head.is_branch() {
-            panic!("Not in a git branch now")
-        }
-        let branch_name = head
-            .shorthand()
-            .unwrap_or_else(|| panic!("Unable to get name of branch"));
-        if branch_name == "master" {
-            panic!("You can't run this from master branch");
-        }
-        let head_commit = match head.peel_to_commit() {
-            Ok(commit) => commit,
-            Err(_e) => panic!("Unable to find commit at HEAD"),
-        };
-        let head_commit_tree = match head_commit.tree() {
-            Ok(tree) => tree,
-            Err(_e) => panic!("Unable to find tree for HEAD commit"),
-        };
 
-        let master_branch = match repo.find_branch("master", BranchType::Local) {
-            Ok(branch) => branch,
-            Err(_e) => panic!("Unable to find master"),
+        let new_migration_files = match git_utils::find_new_files_at_path("db/migrate") {
+            Ok(files) => files,
+            Err(_e) => panic!("Unable to find migration files"),
         };
-        let master_branch_ref = master_branch.into_reference();
-        let master_branch_tree = match master_branch_ref.peel_to_tree() {
-            Ok(tree) => tree,
-            Err(_e) => panic!("Unable to get master tree"),
-        };
-
-        let diff = match repo.diff_tree_to_tree(
-            Some(&master_branch_tree),
-            Some(&head_commit_tree),
-            None,
-        ) {
-            Ok(diff) => diff,
-            Err(_e) => panic!("Unable to get diff"),
-        };
-        let mut new_migration_files: Vec<String> = Vec::new();
-        for delta in diff.deltas() {
-            let path = delta.new_file().path().unwrap();
-            if delta.old_file().id().is_zero()
-                && !delta.new_file().id().is_zero()
-                && path.starts_with("db/migrate/")
-            {
-                new_migration_files.push(String::from(path.to_str().unwrap()));
-            }
-        }
 
         let mut regexes: Vec<(String, &Regex, String)> = Vec::new();
 
@@ -153,8 +86,12 @@ fn main() {
                     let blank_prefix = std::iter::repeat(" ")
                         .take(prefix.len())
                         .collect::<String>();
-                    let position_string =
-                        range_position_string(path_string, matches.start(), matches.end()).unwrap();
+                    let position_string = string_utils::range_position_string(
+                        path_string,
+                        matches.start(),
+                        matches.end(),
+                    )
+                    .unwrap();
                     println!("{}{}", blank_prefix, position_string);
                     let now: DateTime<Utc> = Utc::now();
                     let mut after = String::from(path_string.as_str());
